@@ -21,6 +21,7 @@ OUTPUT = os.path.join(HERE, "playlist.m3u")
 
 TIMEOUT = int(os.environ.get("CHECK_TIMEOUT", "8"))
 WORKERS = int(os.environ.get("CHECK_WORKERS", "50"))
+RETRIES = int(os.environ.get("CHECK_RETRIES", "2"))   # tries before marking dead (reduces flapping)
 STRICT = os.environ.get("STRICT", "0") == "1"
 
 ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
@@ -83,17 +84,22 @@ def check(entry):
     h = {"User-Agent": entry["headers"].get("User-Agent", DEFAULT_UA)}
     if "Referer" in entry["headers"]:
         h["Referer"] = entry["headers"]["Referer"]
-    try:
-        req = urllib.request.Request(entry["url"], headers=h)
-        with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as r:
-            data = r.read(2048).decode("utf-8", "replace")
-            if any(t in data for t in ("#EXTM3U", "#EXTINF", "#EXT-X", "<MPD", "<?xml")):
-                return "alive"
-            return "alive" if 200 <= r.status < 400 else "dead"
-    except urllib.error.HTTPError as e:
-        return "geo" if e.code in (401, 403, 451) else "dead"
-    except Exception:
-        return "dead"
+    # Retry before declaring dead, so a transient blip doesn't drop a working channel (anti-flap).
+    for _ in range(RETRIES):
+        try:
+            req = urllib.request.Request(entry["url"], headers=h)
+            with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as r:
+                data = r.read(2048).decode("utf-8", "replace")
+                if any(t in data for t in ("#EXTM3U", "#EXTINF", "#EXT-X", "<MPD", "<?xml")):
+                    return "alive"
+                return "alive" if 200 <= r.status < 400 else "dead"
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 451):
+                return "geo"
+            # 404 / 5xx — could be transient, so retry
+        except Exception:
+            pass  # timeout / connection error — retry
+    return "dead"
 
 
 def main():

@@ -2,7 +2,7 @@ name: Update channel playlist
 
 on:
   schedule:
-    - cron: "0 2 * * *"        # every day at 02:00 UTC
+    - cron: "15 */4 * * *"     # every 4 hours (at :15 to dodge the busy top-of-hour)
   workflow_dispatch: {}         # manual "Run workflow" button
   push:
     paths:
