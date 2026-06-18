@@ -33,3 +33,5 @@ jobs:
             git commit -m "Auto-update playlist [skip ci]"
             git push
           fi
+      - name: Purge jsDelivr cache (so the app gets the fresh list)
+        run: curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/playlist.m3u" || true
