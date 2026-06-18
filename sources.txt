@@ -1,0 +1,12 @@
+# Free, maintained IPTV sources merged daily into playlist.m3u.
+# Add or remove lines freely. Lines starting with # are ignored.
+# iptv-org is community-maintained and health-checked by its own CI.
+
+https://iptv-org.github.io/iptv/countries/bd.m3u
+https://iptv-org.github.io/iptv/languages/ben.m3u
+https://iptv-org.github.io/iptv/categories/news.m3u
+https://iptv-org.github.io/iptv/categories/sports.m3u
+
+# Bigger optional sources (uncomment to include):
+# https://iptv-org.github.io/iptv/countries/in.m3u
+# https://raw.githubusercontent.com/opensourceflix/OpenSourceFlix/refs/heads/main/iptv.m3u8
