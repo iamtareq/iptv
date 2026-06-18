@@ -12,9 +12,14 @@ and refreshes it **daily via GitHub Actions** — no server, no cost.
 ## One-time setup (free)
 1. Create a GitHub repo (public is fine — **no credentials here**) and push these files.
 2. GitHub → **Actions** tab → enable workflows. (Optional: click **Run workflow** once.)
-3. Open `playlist.m3u` → **Raw** → copy that URL
-   (`https://raw.githubusercontent.com/<you>/<repo>/main/playlist.m3u`).
-4. In the app: **⋮ → 🔗 Channel source URL** → paste the Raw URL → **Save & Load**.
+3. Use the playlist URL. **jsDelivr CDN is recommended** (faster global CDN, and it works on
+   networks that throttle `raw.githubusercontent.com` — e.g. some Bangladeshi ISPs):
+   ```
+   https://cdn.jsdelivr.net/gh/<you>/<repo>@main/playlist.m3u
+   ```
+   (The plain GitHub raw URL `https://raw.githubusercontent.com/<you>/<repo>/main/playlist.m3u`
+   also works on most networks.)
+4. In the app: **⋮ → 🔗 Channel source URL** → paste the URL → **Save & Load**.
 
 That's it — the app caches it and you get a fresh, maintained list every day.
 
