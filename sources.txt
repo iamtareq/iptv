@@ -15,3 +15,7 @@ https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
 # Live sports/match links (FanCode, updates every ~30 min) — best loaded DIRECTLY for live
 # matches, not merged here (the 4h pipeline would only catch stale links):
 #   https://cdn.jsdelivr.net/gh/byte-capsule/FanCode-Hls-Fetcher@main/Fancode_Live.m3u
+
+# Toffee (BD) — JSON, NOT M3U. Handled separately in build_channels.py (TOFFEE_JSON_SOURCES)
+# because each channel needs auth headers (cookie/UA) embedded via #EXTHTTP, refreshed every run:
+#   https://raw.githubusercontent.com/BINOD-XD/Toffee-Auto-Update-Playlist/main/toffee_channel_data.json
