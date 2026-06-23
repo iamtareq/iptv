@@ -9,6 +9,10 @@ https://iptv-org.github.io/iptv/categories/sports.m3u
 https://iptv-org.github.io/iptv/countries/in.m3u
 https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
 
+# Sports — globally reachable (geo-locked ones are kept as "geo", not dropped):
+https://raw.githubusercontent.com/judy-gotv/iptv/main/CricHD.m3u
+https://raw.githubusercontent.com/doms9/iptv/default/M3U8/events.m3u8
+
 # Bigger optional sources (uncomment to include):
 # https://raw.githubusercontent.com/opensourceflix/OpenSourceFlix/refs/heads/main/iptv.m3u8
 
@@ -19,3 +23,7 @@ https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
 # Toffee (BD) — JSON, NOT M3U. Handled separately in build_channels.py (TOFFEE_JSON_SOURCES)
 # because each channel needs auth headers (cookie/UA) embedded via #EXTHTTP, refreshed every run:
 #   https://raw.githubusercontent.com/BINOD-XD/Toffee-Auto-Update-Playlist/main/toffee_channel_data.json
+
+# BD-local / BDIX — handled in build_channels.py (UNCHECKED_M3U_SOURCES), appended WITHOUT
+# health-check because they're only reachable from inside Bangladesh (CI would mark them dead):
+#   abusaeeidx/Mrgify-BDIX-IPTV  +  abusaeeidx/CrestSport-IPTV-Collection (bd.m3u)

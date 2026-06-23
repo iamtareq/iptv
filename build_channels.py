@@ -27,6 +27,14 @@ TOFFEE_JSON_SOURCES = [
     "https://raw.githubusercontent.com/BINOD-XD/Toffee-Auto-Update-Playlist/main/toffee_channel_data.json",
 ]
 
+# BD-local / BDIX M3U sources: reachable only from inside Bangladesh, so CI's US/EU health-check
+# would wrongly mark them dead. We parse + dedupe them like normal M3U but APPEND without checking
+# (they work from the user's BD connection). Some may be dead — heart the working ones in-app.
+UNCHECKED_M3U_SOURCES = [
+    "https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/main/playlist.m3u",
+    "https://raw.githubusercontent.com/abusaeeidx/CrestSport-IPTV-Collection/main/bd.m3u",
+]
+
 TIMEOUT = int(os.environ.get("CHECK_TIMEOUT", "8"))
 WORKERS = int(os.environ.get("CHECK_WORKERS", "50"))
 RETRIES = int(os.environ.get("CHECK_RETRIES", "2"))   # tries before marking dead (reduces flapping)
@@ -42,11 +50,16 @@ def fetch(url, timeout=45):
         return r.read().decode("utf-8", "replace")
 
 
-def load_entries():
-    """Merge + dedupe sources. Each entry keeps its raw directive lines + extracted test headers."""
-    sources = [l.strip() for l in open(SOURCES, encoding="utf-8")
-               if l.strip() and not l.strip().startswith("#")]
-    seen = set()
+def file_sources():
+    return [l.strip() for l in open(SOURCES, encoding="utf-8")
+            if l.strip() and not l.strip().startswith("#")]
+
+
+def load_entries(sources, seen=None):
+    """Merge + dedupe sources. Each entry keeps its raw directive lines + extracted test headers.
+    Pass a shared `seen` set to dedupe across multiple load_entries() calls."""
+    if seen is None:
+        seen = set()
     entries = []
     for src in sources:
         try:
@@ -144,7 +157,8 @@ def check(entry):
 
 
 def main():
-    entries = load_entries()
+    seen = set()
+    entries = load_entries(file_sources(), seen)
     print(f"\nHealth-checking {len(entries)} channels (timeout={TIMEOUT}s, workers={WORKERS}, strict={STRICT})...")
     statuses = [None] * len(entries)
     with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as ex:
@@ -161,15 +175,22 @@ def main():
         if s == "alive" or (s == "geo" and not STRICT):
             out.extend(e["lines"]); out.append(e["urlline"]); kept += 1
 
+    # BD-local / BDIX M3U (unreachable from CI) — appended without health-check.
+    unchecked = load_entries(UNCHECKED_M3U_SOURCES, seen)
+    for e in unchecked:
+        out.extend(e["lines"]); out.append(e["urlline"])
+
     # Toffee (BD geo-locked, auth via #EXTHTTP) — appended without CI health-check.
     toffee = load_toffee_entries()
     for e in toffee:
         out.extend(e["lines"]); out.append(e["urlline"])
 
+    extra = len(unchecked) + len(toffee)
     with open(OUTPUT, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
     print(f"\nalive={alive}  geo/access={geo}  dead={dead}")
-    print(f"KEPT {kept} health-checked + {len(toffee)} toffee -> {kept + len(toffee)} total -> playlist.m3u")
+    print(f"KEPT {kept} health-checked + {len(unchecked)} bd-local + {len(toffee)} toffee "
+          f"-> {kept + extra} total -> playlist.m3u")
 
 
 if __name__ == "__main__":
