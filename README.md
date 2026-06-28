@@ -3,6 +3,24 @@
 A tiny, **free** pipeline that merges maintained IPTV sources into one `playlist.m3u`
 and refreshes it **daily via GitHub Actions** — no server, no cost.
 
+## 🌐 Web player (open in a browser)
+
+A browser-based player lives in [`web/`](web/) and is auto-deployed to GitHub Pages:
+
+> **https://iamtareq.github.io/iptv/**
+
+Open the link and start watching — it loads this same `playlist.m3u`. What to expect:
+
+- **Most channels just play** — they send permissive CORS headers, so the browser plays them directly with zero setup.
+- **Some channels are alive but CORS-blocked** (they work fine in the Android app, where native players ignore CORS). For these, and for **Toffee**, run the bundled proxy locally:
+  ```bash
+  node proxy.js        # starts http://localhost:8889
+  ```
+  The player auto-detects the proxy and routes those channels through it (an HTTPS page is allowed to reach `http://localhost`).
+- **Settings (`⋮`)** — set a custom **Channel source URL** (any `.m3u`) or a different **Toffee proxy origin**. Saved on your device.
+
+> Toffee's CDN is geo-locked to Bangladesh, so the proxy only reaches it from a BD connection — that's why it stays local rather than hosted.
+
 ## How it works
 - `sources.txt` — the M3U sources to merge (default: iptv-org BD / Bengali / news / sports).
 - `build_channels.py` — fetches each source, merges + dedupes, keeps DRM (`#KODIPROP`) and

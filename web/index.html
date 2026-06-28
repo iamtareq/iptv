@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iamtareq · IPTV Player</title>
+  <meta name="description" content="Web-based IPTV player for iamtareq's curated BD & Bengali channel playlist" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:    #0a0c10;
+      --bg-card:    #111318;
+      --bg-hover:   #1a1e27;
+      --bg-active:  #1e2540;
+      --border:     rgba(255,255,255,0.07);
+      --accent:     #4f80ff;
+      --accent2:    #7c5af0;
+      --toffee:     #e8401a;
+      --toffee2:    #ff6b35;
+      --green:      #22c55e;
+      --red:        #ef4444;
+      --yellow:     #f59e0b;
+      --text-1:     #f0f2f8;
+      --text-2:     #9aa0b8;
+      --text-3:     #5a6080;
+      --radius:     12px;
+      --sidebar-w:  330px;
+    }
+
+    html, body { height: 100%; background: var(--bg-deep); color: var(--text-1); font-family: 'Inter', sans-serif; overflow: hidden; }
+
+    #app { display: flex; height: 100vh; }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: var(--sidebar-w); min-width: var(--sidebar-w);
+      background: var(--bg-card); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    #sidebar-header { padding: 18px 16px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+    }
+    .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-sub  { font-size: 11px; color: var(--text-3); font-weight: 400; }
+
+    /* proxy banner */
+    #proxy-banner {
+      margin-bottom: 10px; padding: 8px 10px; border-radius: 8px;
+      background: rgba(232,64,26,.1); border: 1px solid rgba(232,64,26,.25);
+      font-size: 11px; color: #ff8c6a; display: flex; align-items: center; gap: 6px;
+    }
+    #proxy-banner.ok { background: rgba(34,197,94,.1); border-color: rgba(34,197,94,.2); color: #4ade80; }
+    #proxy-banner.hidden { display: none; }
+
+    .search-wrap { position: relative; margin-bottom: 10px; }
+    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+    #search {
+      width: 100%; padding: 8px 10px 8px 34px;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-1); font-size: 13px; outline: none; transition: border-color .2s;
+    }
+    #search:focus { border-color: var(--accent); }
+    #search::placeholder { color: var(--text-3); }
+
+    /* tabs */
+    #source-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+    .src-tab {
+      flex: 1; padding: 6px 8px; border-radius: 8px; text-align: center;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      background: var(--bg-deep); color: var(--text-2);
+      border: 1px solid var(--border); transition: all .15s;
+    }
+    .src-tab:hover { border-color: var(--accent); color: var(--accent); }
+    .src-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .src-tab.toffee-tab.active { background: linear-gradient(135deg, var(--toffee), var(--toffee2)); border-color: var(--toffee); }
+
+    #cats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    #cats::-webkit-scrollbar { display: none; }
+    .cat-pill {
+      flex-shrink: 0; padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      background: var(--bg-deep); color: var(--text-2);
+      border: 1px solid var(--border); transition: all .15s; white-space: nowrap;
+    }
+    .cat-pill:hover { border-color: var(--accent); color: var(--accent); }
+    .cat-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .cat-pill.toffee-pill.active { background: linear-gradient(135deg, var(--toffee), var(--toffee2)); border-color: var(--toffee); }
+
+    #ch-count { padding: 8px 16px 6px; font-size: 11px; color: var(--text-3); flex-shrink: 0; border-bottom: 1px solid var(--border); }
+
+    #ch-list { flex: 1; overflow-y: auto; padding: 6px 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    #ch-list::-webkit-scrollbar { width: 4px; }
+    #ch-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .ch-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
+      cursor: pointer; transition: background .15s; margin-bottom: 2px; border: 1px solid transparent;
+    }
+    .ch-item:hover { background: var(--bg-hover); }
+    .ch-item.active { background: var(--bg-active); border-color: rgba(79,128,255,0.3); }
+    .ch-item.toffee.active { border-color: rgba(232,64,26,.4); background: rgba(232,64,26,.08); }
+
+    .ch-logo { width: 38px; height: 28px; object-fit: contain; border-radius: 5px; background: var(--bg-deep); flex-shrink: 0; border: 1px solid var(--border); }
+    .ch-logo-fallback {
+      width: 38px; height: 28px; border-radius: 5px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .ch-logo-fallback.toffee { background: linear-gradient(135deg, var(--toffee), var(--toffee2)); }
+
+    .ch-info { flex: 1; min-width: 0; }
+    .ch-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-1); }
+    .ch-group { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+    /* toffee badge */
+    .toffee-badge {
+      font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 4px;
+      background: linear-gradient(135deg, var(--toffee), var(--toffee2));
+      color: #fff; flex-shrink: 0; letter-spacing: .3px;
+    }
+
+    .ch-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+    /* ── MAIN ── */
+    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #player-wrap { flex: 1; background: #000; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; }
+    #video { width: 100%; height: 100%; max-height: 100%; object-fit: contain; display: block; }
+
+    #idle-overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, #0d1020 0%, #000 70%); gap: 14px; pointer-events: none;
+    }
+    .idle-icon { font-size: 64px; opacity: .15; }
+    .idle-title { font-size: 20px; font-weight: 600; color: var(--text-2); opacity: .5; }
+    .idle-sub { font-size: 13px; color: var(--text-3); opacity: .4; }
+
+    #spinner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); }
+    .spin-ring { width: 48px; height: 48px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; background: rgba(0,0,0,.75); backdrop-filter: blur(4px); }
+    #error-msg .err-icon { font-size: 40px; }
+    #error-msg .err-text { font-size: 14px; color: var(--red); text-align: center; max-width: 280px; }
+    #error-msg .err-hint { font-size: 12px; color: var(--text-3); text-align: center; max-width: 340px; line-height: 1.6; }
+    #proxy-hint { font-size: 12px; color: var(--yellow); text-align: center; max-width: 340px; line-height: 1.6; display: none; }
+    #retry-btn { margin-top: 6px; padding: 8px 20px; border-radius: 8px; background: var(--accent); border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    #retry-btn:hover { opacity: .85; }
+
+    /* now bar */
+    #now-bar { height: 60px; flex-shrink: 0; background: var(--bg-card); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 14px; }
+    #now-logo { width: 42px; height: 32px; object-fit: contain; border-radius: 6px; background: var(--bg-deep); border: 1px solid var(--border); display: none; }
+    #now-logo-fallback { width: 42px; height: 32px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: none; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; }
+    #now-info { flex: 1; min-width: 0; }
+    #now-name { font-size: 14px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #now-group { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    #status-badge { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,.05); color: var(--text-3); border: 1px solid var(--border); white-space: nowrap; }
+    #status-badge.live    { background: rgba(34,197,94,.1);  color: var(--green);  border-color: rgba(34,197,94,.2); }
+    #status-badge.loading { background: rgba(245,158,11,.1); color: var(--yellow); border-color: rgba(245,158,11,.2); }
+    #status-badge.error   { background: rgba(239,68,68,.1);  color: var(--red);   border-color: rgba(239,68,68,.2); }
+    .vol-wrap { display: flex; align-items: center; gap: 8px; }
+    .vol-wrap svg { color: var(--text-3); flex-shrink: 0; }
+    #vol-slider { -webkit-appearance: none; width: 80px; height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer; }
+    #vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+    /* loading screen */
+    #loading-screen { position: fixed; inset: 0; z-index: 999; background: var(--bg-deep); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+    .load-logo { font-size: 48px; animation: bounce 1s ease-in-out infinite alternate; }
+    @keyframes bounce { to { transform: translateY(-10px); } }
+    .load-title { font-size: 22px; font-weight: 700; }
+    .load-sub { font-size: 13px; color: var(--text-3); }
+    .load-bar-wrap { width: 200px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .load-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; animation: loadbar 1.5s ease-in-out infinite; }
+    @keyframes loadbar { 0% { width: 0%; margin-left: 0; } 50% { width: 60%; } 100% { width: 0%; margin-left: 100%; } }
+
+    #no-results { display: none; text-align: center; padding: 40px 16px; color: var(--text-3); font-size: 13px; }
+
+    /* settings button + modal */
+    #settings-btn {
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+      background: var(--bg-deep); border: 1px solid var(--border); color: var(--text-2);
+      font-size: 18px; line-height: 1; cursor: pointer; transition: all .15s;
+    }
+    #settings-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    #settings-overlay {
+      position: fixed; inset: 0; z-index: 1000; display: none;
+      align-items: center; justify-content: center; padding: 20px;
+      background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+    }
+    #settings-overlay.show { display: flex; }
+    #settings-modal {
+      width: 100%; max-width: 440px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 24px 60px rgba(0,0,0,.5); overflow: hidden;
+    }
+    .sm-head { display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px; border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 700; }
+    #sm-close { background: none; border: none; color: var(--text-3); font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+    #sm-close:hover { color: var(--text-1); background: var(--bg-hover); }
+    .sm-body { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+    .sm-field { display: flex; flex-direction: column; gap: 6px; }
+    .sm-label { font-size: 13px; font-weight: 600; color: var(--text-1); }
+    .sm-field input {
+      width: 100%; padding: 9px 11px; background: var(--bg-deep);
+      border: 1px solid var(--border); border-radius: 8px; color: var(--text-1);
+      font-size: 13px; outline: none; transition: border-color .2s; font-family: inherit;
+    }
+    .sm-field input:focus { border-color: var(--accent); }
+    .sm-hint { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+    .sm-hint code { background: var(--bg-deep); padding: 1px 5px; border-radius: 4px; font-size: 10px; }
+    .sm-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 18px; border-top: 1px solid var(--border); }
+    .sm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); transition: all .15s; font-family: inherit; }
+    .sm-btn.ghost { background: var(--bg-deep); color: var(--text-2); }
+    .sm-btn.ghost:hover { color: var(--text-1); border-color: var(--text-3); }
+    .sm-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .sm-btn.primary:hover { opacity: .88; }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="load-logo">📺</div>
+  <div class="load-title">IPTV Player</div>
+  <div class="load-sub" id="load-status">Playlist লোড হচ্ছে…</div>
+  <div class="load-bar-wrap"><div class="load-bar"></div></div>
+</div>
+
+<div id="app" style="display:none">
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">📺</div>
+        <div style="flex:1; min-width:0">
+          <div class="logo-text">IPTV Player</div>
+          <div class="logo-sub">iamtareq · Live Channels</div>
+        </div>
+        <button id="settings-btn" title="Settings">⋮</button>
+      </div>
+
+      <!-- Proxy status -->
+      <div id="proxy-banner">
+        <span id="proxy-icon">⚠️</span>
+        <span id="proxy-text">Toffee proxy চালু নেই — <code>node proxy.js</code> run করুন</span>
+      </div>
+
+      <!-- Source tabs -->
+      <div id="source-tabs">
+        <div class="src-tab active" data-src="all" id="tab-all">📋 সব Channels</div>
+        <div class="src-tab toffee-tab" data-src="toffee" id="tab-toffee">🟠 Toffee</div>
+      </div>
+
+      <div class="search-wrap">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="search" type="text" placeholder="Channel খুঁজুন…" autocomplete="off" />
+      </div>
+      <div id="cats"></div>
+    </div>
+    <div id="ch-count"></div>
+    <div id="ch-list">
+      <div id="no-results">কোনো channel পাওয়া যায়নি</div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <div id="player-wrap">
+      <video id="video" controls playsinline></video>
+      <div id="idle-overlay">
+        <div class="idle-icon">📡</div>
+        <div class="idle-title">Channel বেছে নিন</div>
+        <div class="idle-sub">বাম দিকের list থেকে যেকোনো channel select করুন</div>
+      </div>
+      <div id="spinner" style="display:none"><div class="spin-ring"></div></div>
+      <div id="error-msg" style="display:none">
+        <div class="err-icon">⚠️</div>
+        <div class="err-text">Stream load করা যায়নি</div>
+        <div class="err-hint" id="err-hint-text">Channel-টি হয়তো এখন offline অথবা CORS block হয়েছে।</div>
+        <div id="proxy-hint">🟠 Toffee channel-এর জন্য proxy server চালু করুন:<br><code style="background:#1a1a2e;padding:4px 8px;border-radius:4px;font-size:11px">node proxy.js</code></div>
+        <button id="retry-btn">🔄 আবার try করো</button>
+      </div>
+    </div>
+
+    <div id="now-bar">
+      <img id="now-logo" src="" alt="" />
+      <div id="now-logo-fallback">TV</div>
+      <div id="now-info">
+        <div id="now-name">কোনো channel চালু নেই</div>
+        <div id="now-group">একটি channel select করুন</div>
+      </div>
+      <div id="status-badge">
+        <span id="status-dot">⚪</span>
+        <span id="status-text">Idle</span>
+      </div>
+      <div class="vol-wrap">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+        <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="1" />
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Settings modal ── -->
+<div id="settings-overlay">
+  <div id="settings-modal">
+    <div class="sm-head">
+      <span>⚙️ Settings</span>
+      <button id="sm-close" title="Close">✕</button>
+    </div>
+    <div class="sm-body">
+      <label class="sm-field">
+        <span class="sm-label">🔗 Channel source URL (.m3u)</span>
+        <input id="sm-source" type="text" spellcheck="false" placeholder="https://cdn.jsdelivr.net/gh/iamtareq/iptv@main/playlist.m3u" />
+        <span class="sm-hint">আপনার নিজের playlist URL দিন, অথবা খালি রাখলে default ব্যবহার হবে।</span>
+      </label>
+      <label class="sm-field">
+        <span class="sm-label">🟠 Toffee proxy origin</span>
+        <input id="sm-proxy" type="text" spellcheck="false" placeholder="http://localhost:8889" />
+        <span class="sm-hint">Toffee channels-এর জন্য। লোকাল হলে <code>node proxy.js</code> চালান। অন্য channels-এ proxy লাগে না।</span>
+      </label>
+    </div>
+    <div class="sm-foot">
+      <button id="sm-reset" class="sm-btn ghost">Reset to defaults</button>
+      <button id="sm-save" class="sm-btn primary">Save &amp; Reload</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_PLAYLIST_URL = 'https://cdn.jsdelivr.net/gh/iamtareq/iptv@main/playlist.m3u';
+const DEFAULT_PROXY_ORIGIN = 'http://localhost:8889';
+const TOFFEE_JSON    = 'https://raw.githubusercontent.com/BINOD-XD/Toffee-Auto-Update-Playlist/main/toffee_channel_data.json';
+
+// User-configurable (⋮ settings) — persisted in localStorage, with safe defaults.
+const settings = {
+  get sourceUrl()   { return localStorage.getItem('iptv_source_url') || DEFAULT_PLAYLIST_URL; },
+  set sourceUrl(v)  { v ? localStorage.setItem('iptv_source_url', v) : localStorage.removeItem('iptv_source_url'); },
+  get proxyOrigin() { return (localStorage.getItem('iptv_proxy_origin') || DEFAULT_PROXY_ORIGIN).replace(/\/+$/, ''); },
+  set proxyOrigin(v){ v ? localStorage.setItem('iptv_proxy_origin', v.replace(/\/+$/, '')) : localStorage.removeItem('iptv_proxy_origin'); },
+};
+const proxyBase   = () => settings.proxyOrigin + '/proxy?url=';
+const proxyHealth = () => settings.proxyOrigin + '/health';
+
+let allChannels    = [];   // from playlist.m3u
+let toffeeChannels = [];   // from toffee JSON
+let filtered       = [];
+let activeSource   = 'all';
+let activeCat      = 'All';
+let currentCh      = null;
+let hls            = null;
+let proxyOk        = false;
+
+const $list     = document.getElementById('ch-list');
+const $search   = document.getElementById('search');
+const $cats     = document.getElementById('cats');
+const $count    = document.getElementById('ch-count');
+const $video    = document.getElementById('video');
+const $idle     = document.getElementById('idle-overlay');
+const $spin     = document.getElementById('spinner');
+const $err      = document.getElementById('error-msg');
+const $errHint  = document.getElementById('err-hint-text');
+const $proxyHint= document.getElementById('proxy-hint');
+const $nowLogo  = document.getElementById('now-logo');
+const $nowFb    = document.getElementById('now-logo-fallback');
+const $nowName  = document.getElementById('now-name');
+const $nowGroup = document.getElementById('now-group');
+const $badge    = document.getElementById('status-badge');
+const $bdgTxt   = document.getElementById('status-text');
+const $volSlider= document.getElementById('vol-slider');
+const $loading  = document.getElementById('loading-screen');
+const $loadSt   = document.getElementById('load-status');
+const $app      = document.getElementById('app');
+const $noRes    = document.getElementById('no-results');
+const $proxyBanner = document.getElementById('proxy-banner');
+const $proxyText   = document.getElementById('proxy-text');
+const $proxyIcon   = document.getElementById('proxy-icon');
+
+// ── Check proxy health ──
+async function checkProxy() {
+  try {
+    const r = await fetch(proxyHealth(), { signal: AbortSignal.timeout(1500) });
+    const j = await r.json();
+    proxyOk = j.ok;
+  } catch { proxyOk = false; }
+  updateProxyBanner();
+}
+
+function updateProxyBanner() {
+  if (proxyOk) {
+    $proxyBanner.className = 'ok';
+    $proxyIcon.textContent = '✅';
+    $proxyText.textContent = 'Toffee proxy চালু আছে — Toffee channels play করা যাবে';
+  } else {
+    $proxyBanner.className = '';
+    $proxyIcon.textContent = '⚠️';
+    $proxyText.innerHTML = 'Toffee proxy বন্ধ — নতুন terminal-এ <code>node proxy.js</code> run করুন';
+  }
+}
+
+// Check proxy every 10 seconds
+checkProxy();
+setInterval(checkProxy, 10000);
+
+// ── Parse M3U ──
+function parseM3U(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const chs = []; let current = null;
+  for (const line of lines) {
+    if (line.startsWith('#EXTINF:')) {
+      current = {};
+      const nameMatch = line.match(/,(.+)$/); current.name = nameMatch ? nameMatch[1].trim() : 'Unknown';
+      const logoMatch = line.match(/tvg-logo="([^"]*)"/); current.logo = logoMatch ? logoMatch[1] : '';
+      const groupMatch = line.match(/group-title="([^"]*)"/); current.group = groupMatch ? groupMatch[1].split(';')[0].trim() : 'General';
+      current.isToffee = false;
+    } else if (!line.startsWith('#') && current) {
+      current.url = line; chs.push(current); current = null;
+    }
+  }
+  return chs;
+}
+
+// ── Parse Toffee JSON ──
+function parseToffeeJSON(json) {
+  return (json.channels || []).map(ch => ({
+    name:     ch.name,
+    logo:     ch.logo || '',
+    group:    ch.category_name || 'Toffee',
+    url:      ch.link,
+    isToffee: true,
+  }));
+}
+
+// ── Build categories ──
+function buildCats(chs) {
+  const isToffeeView = activeSource === 'toffee';
+  const catSet = new Set(['All']);
+  chs.forEach(c => { if (c.group) catSet.add(c.group.split(';')[0].trim()); });
+  const priority = ['All','News','Entertainment','General','Sports','Religious','Music','Kids','Movies','Travel','Culture','LIVE','News Channel','Sports Channel'];
+  const sorted = [...priority.filter(p => catSet.has(p)), ...[...catSet].filter(c => !priority.includes(c))];
+  $cats.innerHTML = '';
+  sorted.forEach(cat => {
+    const pill = document.createElement('div');
+    pill.className = 'cat-pill' + (cat === activeCat ? ' active' : '') + (isToffeeView ? ' toffee-pill' : '');
+    pill.textContent = cat;
+    pill.addEventListener('click', () => {
+      activeCat = cat;
+      document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      applyFilter();
+    });
+    $cats.appendChild(pill);
+  });
+}
+
+// ── Filter ──
+function applyFilter() {
+  const q = $search.value.trim().toLowerCase();
+  const pool = activeSource === 'toffee' ? toffeeChannels : allChannels;
+  filtered = pool.filter(c => {
+    const catOk = activeCat === 'All' || c.group.toLowerCase().includes(activeCat.toLowerCase());
+    const searchOk = !q || c.name.toLowerCase().includes(q) || c.group.toLowerCase().includes(q);
+    return catOk && searchOk;
+  });
+  buildCats(pool);
+  renderList();
+}
+
+// ── Render list ──
+function renderList() {
+  $count.textContent = `${filtered.length} টি channel`;
+  $list.querySelectorAll('.ch-item').forEach(el => el.remove());
+  $noRes.style.display = filtered.length === 0 ? 'block' : 'none';
+  const frag = document.createDocumentFragment();
+  filtered.forEach(ch => {
+    const div = document.createElement('div');
+    div.className = 'ch-item' + (ch.isToffee ? ' toffee' : '') + (currentCh === ch ? ' active' : '');
+    const initial = ch.name.charAt(0).toUpperCase();
+    const fallbackClass = 'ch-logo-fallback' + (ch.isToffee ? ' toffee' : '');
+    const logoHTML = ch.logo
+      ? `<img class="ch-logo" src="${ch.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+         <div class="${fallbackClass}" style="display:none">${initial}</div>`
+      : `<div class="${fallbackClass}">${initial}</div>`;
+    div.innerHTML = `
+      ${logoHTML}
+      <div class="ch-info">
+        <div class="ch-name">${escHtml(ch.name)}</div>
+        <div class="ch-group">${escHtml(ch.group)}</div>
+      </div>
+      ${ch.isToffee ? '<div class="toffee-badge">TOFFEE</div>' : '<div class="ch-live-dot"></div>'}
+    `;
+    div.addEventListener('click', () => playChannel(ch, div));
+    frag.appendChild(div);
+  });
+  $list.insertBefore(frag, $noRes);
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Play channel ──
+// viaProxy=true forces routing through the local proxy — used as an automatic fallback
+// when a non-Toffee channel fails to load directly (usually a CORS block).
+function playChannel(ch, el, viaProxy = false) {
+  currentCh = ch;
+  document.querySelectorAll('.ch-item').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  // Now bar
+  if (ch.logo) {
+    $nowLogo.src = ch.logo; $nowLogo.style.display = 'block';
+    $nowLogo.onerror = () => { $nowLogo.style.display='none'; $nowFb.style.display='flex'; $nowFb.textContent = ch.name.charAt(0); };
+    $nowFb.style.display = 'none';
+  } else {
+    $nowLogo.style.display = 'none'; $nowFb.style.display = 'flex';
+    $nowFb.textContent = ch.name.charAt(0).toUpperCase();
+  }
+  $nowName.textContent = ch.name;
+  $nowGroup.textContent = ch.group;
+  $idle.style.display = 'none'; $err.style.display = 'none';
+  setSpinner(true); setStatus('loading', '⏳', 'Loading…');
+  if (hls) { hls.destroy(); hls = null; }
+  $video.src = '';
+
+  // Toffee always needs the proxy; other channels use it only as a CORS fallback.
+  let streamUrl = ch.url;
+  if (ch.isToffee) {
+    if (!proxyOk) {
+      setSpinner(false);
+      $errHint.textContent = 'Toffee channels-এর জন্য proxy server চালু করতে হবে।';
+      $proxyHint.style.display = 'block';
+      $err.style.display = 'flex';
+      setStatus('error', '❌', 'Proxy নেই');
+      return;
+    }
+    streamUrl = proxyBase() + encodeURIComponent(ch.url);
+    $proxyHint.style.display = 'none';
+  } else if (viaProxy && proxyOk) {
+    streamUrl = proxyBase() + encodeURIComponent(ch.url);
+    setStatus('loading', '🔁', 'Proxy দিয়ে…');
+  }
+
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false,        // off — Toffee is not low-latency
+      liveSyncDurationCount: 3,     // stay 3 segments behind live edge
+      liveMaxLatencyDurationCount: 10,
+      manifestLoadingMaxRetry: 6,   // retry manifest on token expiry
+      manifestLoadingRetryDelay: 1000,
+      levelLoadingMaxRetry: 6,
+      levelLoadingRetryDelay: 1000,
+      fragLoadingMaxRetry: 6,
+      fragLoadingRetryDelay: 500,
+      xhrSetup: (xhr, url) => {
+        // No custom headers needed — proxy handles everything
+      },
+    });
+    hls.loadSource(streamUrl);
+    hls.attachMedia($video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => { setSpinner(false); setStatus('live','🔴','LIVE'); $video.play().catch(()=>{}); });
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      console.warn('HLS error:', data.type, data.details, data.fatal);
+      if (data.fatal) {
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          // Auto-fallback: a non-Toffee channel that fails directly is usually CORS-blocked.
+          // If the proxy is up, retry once through it before giving up.
+          if (!ch.isToffee && !viaProxy && proxyOk) {
+            if (hls) { hls.destroy(); hls = null; }
+            playChannel(ch, el, true);
+            return;
+          }
+          hls.startLoad();   // transient blip / live-edge token refresh
+          return;
+        }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError();
+          return;
+        }
+        setSpinner(false);
+        $errHint.textContent = ch.isToffee
+          ? 'Toffee stream বন্ধ হয়ে গেছে। Channel আবার click করুন।'
+          : (proxyOk ? 'Channel offline — stream-টি এখন কাজ করছে না।'
+                     : 'Channel CORS-blocked হতে পারে — proxy চালালে (⋮ Settings) কাজ করতে পারে।');
+        $err.style.display = 'flex'; setStatus('error','❌','Error');
+      }
+    });
+  } else if ($video.canPlayType('application/vnd.apple.mpegurl')) {
+    $video.src = streamUrl;
+    $video.addEventListener('loadedmetadata', () => { setSpinner(false); setStatus('live','🔴','LIVE'); $video.play().catch(()=>{}); }, { once: true });
+    $video.addEventListener('error', () => { setSpinner(false); $err.style.display='flex'; setStatus('error','❌','Error'); }, { once: true });
+  }
+}
+
+function setSpinner(on) { $spin.style.display = on ? 'flex' : 'none'; }
+function setStatus(type, dot, text) { $badge.className = type; document.getElementById('status-dot').textContent = dot; $bdgTxt.textContent = text; }
+
+document.getElementById('retry-btn').addEventListener('click', () => { if (currentCh) playChannel(currentCh, document.querySelector('.ch-item.active')); });
+$volSlider.addEventListener('input', () => { $video.volume = +$volSlider.value; });
+$video.addEventListener('playing', () => { setSpinner(false); setStatus('live','🔴','LIVE'); });
+$video.addEventListener('waiting', () => setSpinner(true));
+$video.addEventListener('pause', () => { if ($video.src) setStatus('idle','⏸','Paused'); });
+$search.addEventListener('input', applyFilter);
+
+// Source tabs
+document.querySelectorAll('.src-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    activeSource = tab.dataset.src;
+    activeCat = 'All';
+    document.querySelectorAll('.src-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    $search.value = '';
+    applyFilter();
+  });
+});
+
+// ── Settings modal ──
+const $settingsOverlay = document.getElementById('settings-overlay');
+const $smSource = document.getElementById('sm-source');
+const $smProxy  = document.getElementById('sm-proxy');
+
+function openSettings() {
+  // Show the saved override (if any); placeholder shows the default when empty.
+  $smSource.value = localStorage.getItem('iptv_source_url')   || '';
+  $smProxy.value  = localStorage.getItem('iptv_proxy_origin') || '';
+  $settingsOverlay.classList.add('show');
+}
+function closeSettings() { $settingsOverlay.classList.remove('show'); }
+
+document.getElementById('settings-btn').addEventListener('click', openSettings);
+document.getElementById('sm-close').addEventListener('click', closeSettings);
+$settingsOverlay.addEventListener('click', e => { if (e.target === $settingsOverlay) closeSettings(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
+
+document.getElementById('sm-save').addEventListener('click', () => {
+  settings.sourceUrl   = $smSource.value.trim();
+  settings.proxyOrigin = $smProxy.value.trim();
+  location.reload();
+});
+document.getElementById('sm-reset').addEventListener('click', () => {
+  localStorage.removeItem('iptv_source_url');
+  localStorage.removeItem('iptv_proxy_origin');
+  location.reload();
+});
+
+// ── Load everything ──
+async function loadAll() {
+  try {
+    $loadSt.textContent = 'Playlist নামানো হচ্ছে…';
+    const [playlistRes, toffeeRes] = await Promise.allSettled([
+      fetch(settings.sourceUrl).then(r => r.text()),
+      fetch(TOFFEE_JSON).then(r => r.json()),
+    ]);
+
+    if (playlistRes.status === 'fulfilled') {
+      allChannels = parseM3U(playlistRes.value);
+      $loadSt.textContent = `${allChannels.length} channels পাওয়া গেছে…`;
+    }
+    if (toffeeRes.status === 'fulfilled') {
+      toffeeChannels = parseToffeeJSON(toffeeRes.value);
+      $loadSt.textContent += ` + ${toffeeChannels.length} Toffee channels`;
+    }
+
+    filtered = allChannels;
+    buildCats(allChannels);
+    applyFilter();
+    $loading.style.display = 'none';
+    $app.style.display = 'flex';
+  } catch (e) {
+    $loadSt.textContent = '❌ Load করা যায়নি: ' + e.message;
+    setTimeout(loadAll, 5000);
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>
