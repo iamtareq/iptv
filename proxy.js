@@ -86,6 +86,9 @@ function buildHeaders(targetHostname, isToffee) {
 
 // ── Proxy handler ──
 const server = http.createServer(async (req, res) => {
+  // A client (HLS.js) routinely aborts in-flight segment requests when switching quality/
+  // channel — swallow the resulting socket errors so one abort can't crash the whole proxy.
+  res.on('error', () => {});
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -191,13 +194,15 @@ const server = http.createServer(async (req, res) => {
           }
           return viaProxy(l);   // segment / sub-playlist (resolveUrl handles ../)
         }).join('\n');
-        res.writeHead(status, fwdHeaders);
-        res.end(rewritten);
+        if (!res.headersSent) { res.writeHead(status, fwdHeaders); res.end(rewritten); }
       });
-    } else {
+    } else if (!res.headersSent) {
       // TS segment → pipe directly
       res.writeHead(status, fwdHeaders);
+      upRes.on('error', () => { try { res.end(); } catch {} });
       upRes.pipe(res);
+    } else {
+      upRes.resume();   // response already started (retry/timeout race) — drain & drop
     }
   });
 
@@ -223,6 +228,11 @@ const server = http.createServer(async (req, res) => {
   } // end doRequest
   doRequest(3); // up to 3 attempts
 });
+
+// Last-resort safety net: a long-running streaming proxy must never die from one stray
+// socket/stream error (EPIPE, ECONNRESET, late writeHead). Log and keep serving.
+process.on('uncaughtException',  (e) => console.error('⚠️  uncaught:', e.code || e.message));
+process.on('unhandledRejection', (e) => console.error('⚠️  unhandled:', (e && e.message) || e));
 
 // ── Start ──
 (async () => {
