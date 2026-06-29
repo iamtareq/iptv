@@ -35,6 +35,12 @@ UNCHECKED_M3U_SOURCES = [
     "https://raw.githubusercontent.com/abusaeeidx/CrestSport-IPTV-Collection/main/bd.m3u",
 ]
 
+# ClubBD — BD sports/entertainment portal. Its numbered webplayer URLs 302-redirect to fresh
+# tokenized HLS (ExoPlayer follows the redirect each load, so the stable clubbd URL is what we
+# store). Channel list is scraped live each run; streams are BD geo-locked → appended unchecked.
+CLUBBD_TV_URL = "http://www.clubbd.com/tv/"
+CLUBBD_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+
 TIMEOUT = int(os.environ.get("CHECK_TIMEOUT", "8"))
 WORKERS = int(os.environ.get("CHECK_WORKERS", "50"))
 RETRIES = int(os.environ.get("CHECK_RETRIES", "2"))   # tries before marking dead (reduces flapping)
@@ -134,6 +140,30 @@ def load_toffee_entries():
     return entries
 
 
+def load_clubbd_entries():
+    """Scrape clubbd.com/tv/'s JS channel array (name/url pairs) into M3U entries with a
+    browser User-Agent embedded via #EXTHTTP. Appended without health-check (BD geo-locked)."""
+    entries, seen = [], set()
+    try:
+        html = fetch(CLUBBD_TV_URL)
+    except Exception as e:
+        print(f"  FAIL clubbd {CLUBBD_TV_URL}: {e}")
+        return entries
+    ua = "#EXTHTTP:" + json.dumps({"user-agent": CLUBBD_UA}, ensure_ascii=False)
+    pat = re.compile(r"""name:\s*['"]([^'"]+)['"]\s*,\s*url:\s*['"]([^'"]+)['"]""", re.I)
+    n = 0
+    for m in pat.finditer(html):
+        name, url = m.group(1).strip(), m.group(2).strip()
+        if not url or ".m3u8" not in url.lower() or url in seen:
+            continue
+        seen.add(url)
+        entries.append({"lines": [f'#EXTINF:-1 group-title="ClubBD",{name}', ua],
+                        "urlline": url, "url": url, "headers": {}})
+        n += 1
+    print(f"  {n:6} clubbd channels from {CLUBBD_TV_URL}")
+    return entries
+
+
 def check(entry):
     h = {"User-Agent": entry["headers"].get("User-Agent", DEFAULT_UA)}
     if "Referer" in entry["headers"]:
@@ -185,12 +215,17 @@ def main():
     for e in toffee:
         out.extend(e["lines"]); out.append(e["urlline"])
 
-    extra = len(unchecked) + len(toffee)
+    # ClubBD (BD geo-locked sports/entertainment, scraped live) — appended without CI health-check.
+    clubbd = load_clubbd_entries()
+    for e in clubbd:
+        out.extend(e["lines"]); out.append(e["urlline"])
+
+    extra = len(unchecked) + len(toffee) + len(clubbd)
     with open(OUTPUT, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
     print(f"\nalive={alive}  geo/access={geo}  dead={dead}")
     print(f"KEPT {kept} health-checked + {len(unchecked)} bd-local + {len(toffee)} toffee "
-          f"-> {kept + extra} total -> playlist.m3u")
+          f"+ {len(clubbd)} clubbd -> {kept + extra} total -> playlist.m3u")
 
 
 if __name__ == "__main__":
