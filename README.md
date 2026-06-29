@@ -9,17 +9,26 @@ A browser-based player lives in [`web/`](web/) and is auto-deployed to GitHub Pa
 
 > **https://iamtareq.github.io/iptv/**
 
-Open the link and start watching — it loads this same `playlist.m3u`. What to expect:
+Open the link and start watching — it loads this same `playlist.m3u`. **Most channels just play**
+in the hosted page: they send permissive CORS headers, so the browser streams them directly with
+zero setup. (Dead/geo-locked channels and ones that lack CORS won't play — that's normal.)
 
-- **Most channels just play** — they send permissive CORS headers, so the browser plays them directly with zero setup.
-- **Some channels are alive but CORS-blocked** (they work fine in the Android app, where native players ignore CORS). For these, and for **Toffee**, run the bundled proxy locally:
-  ```bash
-  node proxy.js        # starts http://localhost:8889
-  ```
-  The player auto-detects the proxy and routes those channels through it (an HTTPS page is allowed to reach `http://localhost`).
+### Want Toffee + the CORS-blocked channels too? Run it locally
+
+A browser can't let the **hosted HTTPS** page talk to a proxy on your own machine
+(Private-Network / mixed-content security). So for full coverage, run the player **locally**,
+where `proxy.js` also serves the player — one origin, no CORS issues:
+
+```bash
+node proxy.js          # then open http://localhost:8889
+```
+
+Now Toffee and the CORS-blocked channels route through the proxy automatically. (Or just use the
+**Android app** — native players ignore CORS, so everything works there.)
+
 - **Settings (`⋮`)** — set a custom **Channel source URL** (any `.m3u`) or a different **Toffee proxy origin**. Saved on your device.
 
-> Toffee's CDN is geo-locked to Bangladesh, so the proxy only reaches it from a BD connection — that's why it stays local rather than hosted.
+> Toffee's CDN is geo-locked to Bangladesh, so the proxy only reaches it from a BD connection — another reason it stays local rather than hosted.
 
 ## How it works
 - `sources.txt` — the M3U sources to merge (default: iptv-org BD / Bengali / news / sports).

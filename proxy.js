@@ -3,12 +3,19 @@
  * - Host header: derived from actual target URL (not hardcoded)
  * - SSL: verification disabled (Toffee CDN uses mixed hostnames)
  * - M3U8 rewriting: segments + sub-playlists routed through proxy
- * Run: node proxy.js
+ * - ALSO serves the web player at http://localhost:8889 so everything (incl. Toffee)
+ *   runs same-origin with no CORS / Private-Network / mixed-content issues.
+ * Run: node proxy.js  → open http://localhost:8889
  */
 
 const http  = require('http');
 const https = require('https');
 const url   = require('url');
+const fs    = require('fs');
+const path  = require('path');
+
+// The player lives in web/index.html next to this file.
+const PLAYER_HTML = path.join(__dirname, 'web', 'index.html');
 
 const PORT = 8889;
 const TOFFEE_JSON = 'https://raw.githubusercontent.com/BINOD-XD/Toffee-Auto-Update-Playlist/main/toffee_channel_data.json';
@@ -91,6 +98,20 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, cookie: !!toffeeCookie }));
+    return;
+  }
+
+  // Serve the player itself so http://localhost:8889 is a complete, same-origin app.
+  if (req.url === '/' || req.url === '/index.html') {
+    fs.readFile(PLAYER_HTML, (err, html) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('web/index.html not found — run from the repo root.');
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
+      }
+    });
     return;
   }
 
