@@ -33,11 +33,19 @@ TOFFEE_JSON_SOURCES = [
 UNCHECKED_M3U_SOURCES = [
     "https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/main/playlist.m3u",
     "https://raw.githubusercontent.com/abusaeeidx/CrestSport-IPTV-Collection/main/bd.m3u",
+    # ClubBD: site is BD-geo-locked so CI can't scrape it. We commit a pre-scraped clubbd.m3u
+    # (regenerate from a BD machine — see load_clubbd_entries) and read it back from GitHub here.
+    "https://raw.githubusercontent.com/iamtareq/iptv/main/clubbd.m3u",
 ]
 
 # ClubBD — BD sports/entertainment portal. Its numbered webplayer URLs 302-redirect to fresh
 # tokenized HLS (ExoPlayer follows the redirect each load, so the stable clubbd URL is what we
-# store). Channel list is scraped live each run; streams are BD geo-locked → appended unchecked.
+# store). The site is geo-locked to BD, so load_clubbd_entries() must be run FROM BANGLADESH to
+# regenerate clubbd.m3u, e.g.:
+#   python -c "import build_channels as b; e=b.load_clubbd_entries(); \
+#     open('clubbd.m3u','w',encoding='utf-8',newline='\n').write('\n'.join(['#EXTM3U']+ \
+#       [l for x in e for l in x['lines']+[x['urlline']]])+'\n')"
+# then commit clubbd.m3u. The committed file is merged via UNCHECKED_M3U_SOURCES above.
 CLUBBD_TV_URL = "http://www.clubbd.com/tv/"
 CLUBBD_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 
@@ -215,17 +223,14 @@ def main():
     for e in toffee:
         out.extend(e["lines"]); out.append(e["urlline"])
 
-    # ClubBD (BD geo-locked sports/entertainment, scraped live) — appended without CI health-check.
-    clubbd = load_clubbd_entries()
-    for e in clubbd:
-        out.extend(e["lines"]); out.append(e["urlline"])
-
-    extra = len(unchecked) + len(toffee) + len(clubbd)
+    # (ClubBD channels arrive via the committed clubbd.m3u in UNCHECKED_M3U_SOURCES above —
+    #  the site itself is BD-geo-locked so CI can't scrape it live.)
+    extra = len(unchecked) + len(toffee)
     with open(OUTPUT, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
     print(f"\nalive={alive}  geo/access={geo}  dead={dead}")
     print(f"KEPT {kept} health-checked + {len(unchecked)} bd-local + {len(toffee)} toffee "
-          f"+ {len(clubbd)} clubbd -> {kept + extra} total -> playlist.m3u")
+          f"-> {kept + extra} total -> playlist.m3u")
 
 
 if __name__ == "__main__":
