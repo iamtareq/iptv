@@ -177,11 +177,19 @@ const server = http.createServer(async (req, res) => {
         // request so it works whether we run on localhost or a hosted origin.
         const proto    = req.headers['x-forwarded-proto'] || 'http';
         const selfBase = `${proto}://${req.headers.host}/proxy?url=`;
+        const viaProxy = (uri) => `${selfBase}${encodeURIComponent(resolveUrl(target, uri))}`;
         const rewritten = body.split('\n').map(line => {
           const l = line.trim();
-          if (!l || l.startsWith('#')) return line;
-          const abs = resolveUrl(target, l);   // ← resolves ../ correctly
-          return `${selfBase}${encodeURIComponent(abs)}`;
+          if (!l) return line;
+          if (l.startsWith('#')) {
+            // Tag lines can carry a URI="..." that ALSO needs proxying — most importantly
+            // #EXT-X-KEY (AES-128 decryption key) and #EXT-X-MAP. Without this, encrypted
+            // streams (e.g. Toffee) fetch the key off-proxy and fail to decrypt → black screen.
+            return l.includes('URI="')
+              ? line.replace(/URI="([^"]+)"/g, (m, uri) => uri.startsWith('data:') ? m : `URI="${viaProxy(uri)}"`)
+              : line;
+          }
+          return viaProxy(l);   // segment / sub-playlist (resolveUrl handles ../)
         }).join('\n');
         res.writeHead(status, fwdHeaders);
         res.end(rewritten);

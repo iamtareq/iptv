@@ -71,11 +71,19 @@ export default {
     if (isM3U8) {
       const body = await upstream.text();
       const self = `${url.origin}/proxy?url=`;
+      const viaProxy = (uri) => { try { return self + encodeURIComponent(new URL(uri, target).href); } catch { return null; } };
       const rewritten = body.split('\n').map(line => {
         const l = line.trim();
-        if (!l || l.startsWith('#')) return line;
-        let abs; try { abs = new URL(l, target).href; } catch { return line; }
-        return self + encodeURIComponent(abs);
+        if (!l) return line;
+        if (l.startsWith('#')) {
+          // Also proxy URI="..." in tag lines (esp. #EXT-X-KEY / #EXT-X-MAP) so encrypted
+          // streams can fetch their AES key through us instead of off-proxy (→ decrypt OK).
+          return l.includes('URI="')
+            ? line.replace(/URI="([^"]+)"/g, (m, uri) => { const p = uri.startsWith('data:') ? null : viaProxy(uri); return p ? `URI="${p}"` : m; })
+            : line;
+        }
+        const p = viaProxy(l);
+        return p || line;
       }).join('\n');
       return new Response(rewritten, { headers: cors({ 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-cache, no-store, must-revalidate' }) });
     }
