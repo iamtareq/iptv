@@ -354,6 +354,14 @@ const settings = {
 const proxyBase   = () => settings.proxyOrigin + '/proxy?url=';
 const proxyHealth = () => settings.proxyOrigin + '/health';
 
+// Allow one-time wiring via a shareable link, then remember it:
+//   …/iptv/?proxy=https://my-proxy.workers.dev   ·   …/iptv/?src=<playlist.m3u>
+(() => {
+  const qp = new URLSearchParams(location.search);
+  if (qp.has('proxy')) settings.proxyOrigin = qp.get('proxy').trim();
+  if (qp.has('src'))   settings.sourceUrl   = qp.get('src').trim();
+})();
+
 let allChannels    = [];   // from playlist.m3u
 let toffeeChannels = [];   // from toffee JSON
 let filtered       = [];

@@ -28,7 +28,41 @@ Now Toffee and the CORS-blocked channels route through the proxy automatically. 
 
 - **Settings (`⋮`)** — set a custom **Channel source URL** (any `.m3u`) or a different **Toffee proxy origin**. Saved on your device.
 
-> Toffee's CDN is geo-locked to Bangladesh, so the proxy only reaches it from a BD connection — another reason it stays local rather than hosted.
+### Make the *hosted* link play Toffee + CORS channels (point it at a proxy)
+
+The hosted page can use any HTTPS proxy you give it — wire it with a link (remembered after):
+
+```
+https://iamtareq.github.io/iptv/?proxy=https://YOUR-PROXY
+```
+
+Two ways to get that `YOUR-PROXY`:
+
+| Option | Toffee? | CORS-blocked? | PC on? | Setup |
+|---|---|---|---|---|
+| **A. Cloudflare Worker** ([`worker.js`](worker.js)) | ⚠️ geo gamble | ✅ yes | ❌ no | deploy once, free |
+| **B. Tunnel to your local `proxy.js`** | ✅ **reliable** | ✅ yes | ✅ yes | run 2 commands |
+
+**A — Cloudflare Worker** (always-on, no PC; but Toffee may 403). At dash.cloudflare.com →
+*Workers & Pages → Create → Worker*, paste [`worker.js`](worker.js), Deploy. You get
+`https://<name>.workers.dev`. Open `…/iptv/?proxy=https://<name>.workers.dev`. This always fixes
+CORS-blocked channels; Toffee works only if Cloudflare's egress is seen as Bangladesh (not guaranteed —
+its egress is a Cloudflare IP, not a BD one).
+
+**B — Tunnel** (guaranteed Toffee, because the fetch happens on your BD machine). Run the local
+proxy, then expose it over HTTPS with a free [cloudflared](https://developers.cloudflare.com/cloudflare-tunnel/)
+quick tunnel (no account):
+
+```bash
+node proxy.js
+cloudflared tunnel --url http://localhost:8889      # prints https://<random>.trycloudflare.com
+```
+
+Then open `…/iptv/?proxy=https://<random>.trycloudflare.com`. Now the hosted link plays everything,
+including Toffee — as long as your PC + tunnel are running. (Use a **named** tunnel for a stable URL.)
+
+> Why no fully-hosted Toffee: Toffee's CDN is geo-locked to Bangladesh (403 to non-BD IPs), so the
+> proxy must sit on a BD IP. No free cloud host has one — only your own BD machine does.
 
 ## How it works
 - `sources.txt` — the M3U sources to merge (default: iptv-org BD / Bengali / news / sports).
