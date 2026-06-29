@@ -1,0 +1,5 @@
+# Cloudflare Workers config — deploys worker.js as the IPTV stream proxy.
+# Used by the dashboard's Git-connected build (`npx wrangler deploy`).
+name = "iptv-proxy"
+main = "worker.js"
+compatibility_date = "2026-06-01"
